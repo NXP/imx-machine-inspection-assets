@@ -1,0 +1,620 @@
+<!doctype html>
+<html>
+   <head>
+      <meta charset = "utf-8">
+      <title> Conveyor Belt</title>
+      <script src="https://cdn.babylonjs.com/babylon.js"></script>
+      <script src="https://cdn.babylonjs.com/gui/babylon.gui.min.js"></script>
+      <script src="https://cdn.babylonjs.com/loaders/babylon.glTF2FileLoader.js"></script>
+      <script src="https://cdn.babylonjs.com/materialsLibrary/babylonjs.materials.min.js"></script>
+      <style>
+	html, body {
+                overflow: hidden;
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                padding: 0;
+            }
+         canvas { width: 100%; height: 100%;}
+      </style>
+   </head>
+   
+   <body>
+      <canvas id = "renderCanvas"></canvas>
+      <script type = "text/javascript">
+	function random_int(max) {
+		return Math.floor(Math.random() * Math.floor(max));
+	}
+
+	const STATE_PLAY = 0;
+	const STATE_PAUSE = 1;
+	const STATE_CALIB = 2;
+	const CLASS_NAMES = ["apple", "orange"];
+
+        //const cameraFoV = 0.4;
+        //const cameraHeight = 1000;
+        const cameraFoV = 0.2;
+        const cameraHeight = 1800;
+	const conveyorWidth = 310;
+	const conveyorLength = 800;
+	const conveyorFruitMargin = 150;
+
+	var state = STATE_PLAY;
+	var elapsed = 0;
+	var drop_freq = 1;
+	var belt_speed = 0.2;
+	var score = 0;
+	var misses = 0;
+	var errors = 0;
+	var speed_slider;
+	var rate_slider;
+
+	var canvas = document.getElementById("renderCanvas");
+	var engine = new BABYLON.Engine(canvas, true);
+	var createScene  = function() {
+		var apple1, apple3;
+		var scene = new BABYLON.Scene(engine);
+		scene.clearColor = new BABYLON.Color3(0.4, 0.4, 0.4);
+
+		var camera = new BABYLON.ArcRotateCamera("Camera", 0, 0, cameraHeight, new BABYLON.Vector3(200, 0, 0), scene);
+		camera.fov = cameraFoV;
+
+		//var light0 = new BABYLON.PointLight("Omni", new BABYLON.Vector3(0, 0, 100), scene);
+
+		//Light direction is up and left
+		//var light1 = new BABYLON.HemisphericLight("hemiLight", new BABYLON.Vector3(0, 1, 0), scene);
+		//light1.diffuse = new BABYLON.Color3(0.5, 0.5, 0.5);
+		//light1.specular = new BABYLON.Color3(0.1, 0.1, 0.1);
+		//light1.groundColor = new BABYLON.Color3(0.2, 0.2, 0.2);
+
+		var dirHeight = -2.0;
+		var light2 = new BABYLON.DirectionalLight("dirlight2", new BABYLON.Vector3(1, dirHeight, 1), scene);
+		var light3 = new BABYLON.DirectionalLight("dirlight3", new BABYLON.Vector3(1, dirHeight, -1), scene);
+		var light4 = new BABYLON.DirectionalLight("dirlight4", new BABYLON.Vector3(-1, dirHeight, -1), scene);
+		var light5 = new BABYLON.DirectionalLight("dirlight5", new BABYLON.Vector3(-1, dirHeight, 1), scene);
+		var dirDiffuse = 1.0;
+		var dirSpecular = 0.6;
+		light2.diffuse = new BABYLON.Color3(dirDiffuse, dirDiffuse, dirDiffuse);
+		light2.specular = new BABYLON.Color3(dirSpecular, dirSpecular, dirSpecular);
+		light2.groundColor = new BABYLON.Color3(0.3, 0.3, 0.3);
+		light2.position = new BABYLON.Vector3(0, dirHeight*200, 0); 
+		light3.diffuse = new BABYLON.Color3(dirDiffuse, dirDiffuse, dirDiffuse);
+		light3.specular = new BABYLON.Color3(dirSpecular, dirSpecular, dirSpecular);
+		light3.position = new BABYLON.Vector3(0, dirHeight*200, 0); 
+		light4.diffuse = new BABYLON.Color3(dirDiffuse, dirDiffuse, dirDiffuse);
+		light4.specular = new BABYLON.Color3(dirSpecular, dirSpecular, dirSpecular);
+		light4.position = new BABYLON.Vector3(0, dirHeight*200, 0); 
+		light5.diffuse = new BABYLON.Color3(dirDiffuse, dirDiffuse, dirDiffuse);
+		light5.specular = new BABYLON.Color3(dirSpecular, dirSpecular, dirSpecular);
+		light5.position = new BABYLON.Vector3(0, dirHeight*200, 0); 
+
+		// Shadows
+		var shadowSize = 1024;
+		var shadowGenerator2 = new BABYLON.ShadowGenerator(shadowSize, light2);
+		light2.autoCalcShadowZBounds = true;
+		shadowGenerator2.useBlurExponentialShadowMap = true;
+
+		var shadowGenerator3 = new BABYLON.ShadowGenerator(shadowSize, light3);
+		light3.autoCalcShadowZBounds = true;
+		shadowGenerator3.useBlurExponentialShadowMap = true;
+
+		var shadowGenerator4 = new BABYLON.ShadowGenerator(shadowSize, light4);
+		light4.autoCalcShadowZBounds = true;
+		shadowGenerator4.useBlurExponentialShadowMap = true;
+
+		var shadowGenerator5 = new BABYLON.ShadowGenerator(shadowSize, light5);
+		light5.autoCalcShadowZBounds = true;
+		shadowGenerator5.useBlurExponentialShadowMap = true;
+
+
+		//shadowGenerator2.addShadowCaster(origin);
+		//shadowGenerator3.addShadowCaster(origin);
+		//shadowGenerator4.addShadowCaster(origin);
+		//shadowGenerator5.addShadowCaster(origin);
+
+		var conveyor = BABYLON.MeshBuilder.CreateBox("conveyor", {height: 10, width: conveyorLength, depth: conveyorWidth}, scene);
+		conveyor.position = new BABYLON.Vector3(0, -60, 0); 
+		conveyor.receiveShadows = true;
+
+		conveyor.material = new BABYLON.StandardMaterial("mat", scene);
+		conveyor.material.diffuseColor = new BABYLON.Color3(0.25, 0.25, 0.25);
+		conveyor.material.specularColor = new BABYLON.Color3(0.4, 0.4, 0.4);
+
+/*	
+		var apple3;
+		BABYLON.SceneLoader.ImportMesh("", "./3D_models/apple3/gltf/", "scene.gltf", scene, function(newMeshes) {
+		        // do something with the scene
+			apple3 = newMeshes[0];
+			//apple3.position = new BABYLON.Vector3(20, -5, 0);
+			//shadowGenerator2.addShadowCaster(apple3);
+			//shadowGenerator3.addShadowCaster(apple3);
+			//shadowGenerator4.addShadowCaster(apple3);
+			//shadowGenerator5.addShadowCaster(apple3);
+		});
+
+		var apple1;
+		BABYLON.SceneLoader.ImportMesh("", "./3D_models/apple1/gltf/", "scene.gltf", scene, function(newMeshes) {
+		        // do something with the scene
+			apple1 = newMeshes[0];
+			apple3.position = new BABYLON.Vector3(20, -5, 0);
+			//shadowGenerator2.addShadowCaster(apple1);
+			//shadowGenerator3.addShadowCaster(apple1);
+			//shadowGenerator4.addShadowCaster(apple1);
+			//shadowGenerator5.addShadowCaster(apple1);
+		});
+*/
+		var fruits = [[], []];
+		var apples = [];
+		var oranges = [];
+                var calibration_apple;
+		var mesh_names = [ "apple01_lr", "apple02_lr", "apple03_lr", "apple04_lr", "apple05_lr", "apple06_lr", "apple09_lr", "apple10_lr",
+				"20_orange", "58_orange", "72_orange" ];
+		//var mesh_names = [ "apple01_lr", "apple02_lr", "apple03_lr", "apple04_lr", "apple05_lr", "apple06_lr", "apple08_lr", "apple09_lr", "apple10_lr", "apple11_lr",
+		//		"20_orange", "58_orange", "72_orange" ];
+		BABYLON.SceneLoader.ImportMesh(mesh_names, "./3D_models/fruits/gltf/", "scene.gltf", scene, function(newMeshes) {
+		        // do something with the scene
+
+			newMeshes.forEach(function(mesh){
+				mesh.isVisible = false;
+				mesh.isPickable = false;
+				if (mesh.name.match("apple")) {
+					mesh.metadata = CLASS_NAMES[0] + "_template";
+					apples.push(mesh);
+					fruits[0].push(mesh);
+				}
+				if (mesh.name.match("orange")) {
+					mesh.metadata = CLASS_NAMES[1] + "_template";
+					oranges.push(mesh);
+					fruits[1].push(mesh);
+				}
+				console.log(mesh.name);
+			});
+
+			var idx = 0;
+			calibration_apple = fruits[0][idx].instantiateHierarchy();
+			//var calibration_apple =oranges[idx].instantiateHierarchy();
+			calibration_apple.setParent(calibration_apple.parent.parent);
+			calibration_apple.name = "a"+idx;
+			calibration_apple.position.x = -100;
+			calibration_apple.position.z = 0;
+			calibration_apple.isVisible = false;
+			calibration_apple.isPickable = false;
+			calibration_apple.metadata = "calib_fruit";
+		});
+
+		var drawStatus = function() {
+			status_text.text = "H: " + score + " M: " + misses + " E: " + errors;
+		}
+
+		var checkCollision = function (newMesh) {
+			var res = false;
+			var count = 0;
+			for (var i = 0; i < scene.meshes.length; i++) {
+				var mesh = scene.meshes[i];
+				if ((mesh.metadata == CLASS_NAMES[0]) || (mesh.metadata == CLASS_NAMES[1])) {
+					if (mesh.intersectsMesh(newMesh, true)) {
+						res = true;
+						//console.log("mesh " + newMesh.uniqueId + "intersects with mesh " + mesh.uniqueId + " " + mesh.position.x + " " + mesh.position.z + " " + newMesh.position.x + " " + newMesh.position.z);
+					}
+					count++;
+					//console.log("mesh " + newMesh.uniqueId + " checked with mesh " + mesh.uniqueId + " " + mesh.position.x + " " + mesh.position.z + " " + newMesh.position.x + " " + newMesh.position.z);
+				}
+			}
+
+			//console.log("n meshes = " + count + " id = " + newMesh.uniqueId + " res = " + res);
+			return res;
+		}
+
+        	//scene.actionManager = new BABYLON.ActionManager(scene);
+        	//scene.actionManager.registerAction(
+            	//	new BABYLON.ExecuteCodeAction({ trigger: BABYLON.ActionManager.OnEveryFrameTrigger },
+		scene.registerBeforeRender(
+                		function(){
+					if (state != STATE_PLAY)
+						return;
+
+					interval = engine.getDeltaTime();
+					elapsed += interval;
+
+					if (elapsed > 1000/drop_freq) {
+						//console.log(" meshes before = " + scene.meshes.length);
+						elapsed = 0;
+						//Spawn new fruit
+						object_class = random_int(2);
+						if (fruits[object_class].length == 0)
+							return;
+				                idx = random_int(fruits[object_class].length);
+						//console.log("Spawning new fruit " + object_class + " " + idx);
+				                fruit = fruits[object_class][idx].instantiateHierarchy();
+						fruit.setParent(fruit.parent.parent);
+						fruit.name = "f" + object_class + " " + idx;
+						fruit.rotation = new BABYLON.Vector3(Math.random()*2*Math.PI, Math.random()*2*Math.PI, Math.random()*2*Math.PI);
+						fruit.position.y = 0;
+						search_range = conveyorWidth - conveyorFruitMargin;
+						fruit.position.z = random_int(search_range) - search_range / 2;
+						fruit.position.x = -(random_int(290) + conveyorLength / 2);
+						fruit.computeWorldMatrix(true);
+						i = 50;
+						while (checkCollision(fruit) && (i > 0)) {
+							fruit.position.z = random_int(search_range) - search_range / 2;
+							fruit.position.x = -(random_int(300) + conveyorLength / 2);
+							fruit.computeWorldMatrix(true);
+							i--;
+						}
+						if ( i > 0) {	
+							fruit.isVisible = true;
+							fruit.isPickable = true;
+							fruit.metadata = CLASS_NAMES[object_class]; //fruits[object_class][idx].metadata;
+						} else
+							fruit.dispose();
+						//console.log(i + " Spawned new fruit " + fruit.uniqueId + " " + object_class + " x = " + fruit.position.x + " y = " + fruit.position.z);
+						//console.log(" meshes after = " + scene.meshes.length);
+					} 
+
+					for (var i = 0; i < scene.meshes.length; i++) {
+						mesh = scene.meshes[i];
+						if ((mesh.metadata == CLASS_NAMES[0] || mesh.metadata == CLASS_NAMES[1])) {
+							//mesh.position.addInPlace(new BABYLON.Vector3(belt_speed*interval, 0, 0));
+							mesh.position.x += belt_speed*interval;
+							//console.log("Moving " + mesh.uniqueId + " dist = " + belt_speed*interval);
+							//console.log("elapsed = " + elapsed + " speed = " + belt_speed + " interval = " + interval);
+						}
+					}
+
+					for (var i = 0; i < scene.meshes.length; i++) {
+						mesh = scene.meshes[i];
+						if ((mesh.metadata == CLASS_NAMES[0] || mesh.metadata == CLASS_NAMES[1])) {
+							if (mesh.position.x > conveyorLength/2) {
+								if (mesh.metadata == CLASS_NAMES[0]) {
+									misses++;
+									drawStatus();
+								}
+								mesh.dispose();
+								i--;
+							}
+						}
+					}
+
+                		}
+            //		)
+        	);
+		
+
+		// UI
+		var gui = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("UI");
+		var ui_height = "60px";
+
+		var setup_ui = function (element) {
+			element.isPointerBlocker = true;
+                	element.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+			element.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_BOTTOM;
+			element.height = ui_height;
+			element.top = "0%";
+			element.color = "white";
+			element.background = "black";
+			element.alpha = 0.5;
+			element.thickness = 3;
+			element.cornerRadius = 30;
+			gui.addControl(element);
+		}
+
+		var reset = function () {
+			score = 0;
+			misses = 0;
+			errors = 0;
+			//belt_speed = 0.2;
+			//drop_freq = 1;
+			drawStatus();
+			//speed_slider.value = belt_speed*1000;
+			//rate_slider.value = drop_freq;
+		}
+
+		var clear_conveyor = function () {
+			for (var i = 0; i < scene.meshes.length; i++) {
+				var mesh = scene.meshes[i];
+				if ((mesh.metadata == CLASS_NAMES[0]) || (mesh.metadata == CLASS_NAMES[1])) {
+					console.log("removing mesh " + mesh.uniqueId + " metadata " + mesh.metadata);
+					mesh.dispose();
+					i--;
+				} else
+					console.log("kept mesh " + mesh.uniqueId + " metadata " + mesh.metadata);
+			}
+		}
+
+		var st_hint = new BABYLON.GUI.TextBlock("st_hint", "" + Math.round(belt_speed*1000));
+                st_hint.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+		st_hint.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_BOTTOM;
+		st_hint.width = "10%";
+                st_hint.left = "7.5%";
+		st_hint.height = ui_height;
+		st_hint.top = "-5%";
+		st_hint.color = "black";
+		st_hint.background = "black";
+		st_hint.alpha = 0.5;
+		st_hint.thickness = 3;
+		st_hint.fontSize = 24;
+		st_hint.isVisible = false;
+		gui.addControl(st_hint);
+
+		var speed = new BABYLON.GUI.Rectangle();
+                speed.left = "0%";
+		speed.width = "25%";
+		speed.onPointerDownObservable.add(function() {
+			st_hint.isVisible = true;
+		});
+		speed.onPointerUpObservable.add(function() {
+			st_hint.isVisible = false;
+		});
+
+		setup_ui(speed);
+			
+		var st = new BABYLON.GUI.TextBlock("st", "Belt speed:");
+                st.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+		st.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_BOTTOM;
+		st.width = "45%";
+                st.left = "0%";
+		st.color = "white";
+		speed.addControl(st);
+
+		speed_slider = new BABYLON.GUI.Slider();
+                speed_slider.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+		speed_slider.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_CENTER;
+		speed_slider.height = "60%";
+		speed_slider.width = "55%";
+                speed_slider.left = "45%";
+		speed_slider.color = "green";
+		speed_slider.isThumbCircle = true;
+		speed_slider.maximum = 0.5;
+		speed_slider.minimum = 0;
+		speed_slider.value = belt_speed;
+		speed_slider.step = 0.01;
+		speed_slider.onValueChangedObservable.add(function(value) {
+			belt_speed = value;
+			st_hint.text = "" + Math.round(value*1000);
+		});
+		speed.addControl(speed_slider);
+
+		var rt_hint = new BABYLON.GUI.TextBlock("rt_hint", "" + drop_freq);
+                rt_hint.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+		rt_hint.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_BOTTOM;
+		rt_hint.width = "10%";
+                rt_hint.left = "32.5%";
+		rt_hint.height = ui_height;
+		rt_hint.top = "-5%";
+		rt_hint.color = "black";
+		rt_hint.background = "black";
+		rt_hint.alpha = 0.5;
+		rt_hint.thickness = 3;
+		rt_hint.fontSize = 24;
+		rt_hint.isVisible = false;
+		gui.addControl(rt_hint);
+
+		var rate = new BABYLON.GUI.Rectangle();
+                rate.left = "25%";
+		rate.width = "25%";
+		rate.onPointerDownObservable.add(function() {
+			rt_hint.isVisible = true;
+		});
+		rate.onPointerUpObservable.add(function() {
+			rt_hint.isVisible = false;
+		});
+
+		setup_ui(rate);
+			
+		var rt = new BABYLON.GUI.TextBlock("rt", "Drop freq:");
+                rt.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+		rt.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_CENTER;
+		rt.width = "45%";
+                rt.left = "0%";
+		rt.color = "white";
+		rate.addControl(rt);
+
+		rate_slider = new BABYLON.GUI.Slider();
+                rate_slider.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+		rate_slider.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_CENTER;
+		rate_slider.height = "60%";
+		rate_slider.width = "55%";
+                rate_slider.left = "45%";
+		rate_slider.color = "green";
+		rate_slider.isThumbCircle = true;
+		rate_slider.maximum = 10;
+		rate_slider.minimum = 0;
+		rate_slider.value = drop_freq;
+		rate_slider.step = 0.2;
+		rate_slider.onValueChangedObservable.add(function(value) {
+			drop_freq = value;
+			rt_hint.text = "" + value;
+		});
+		rate.addControl(rate_slider);
+
+		var play_button = BABYLON.GUI.Button.CreateSimpleButton("play", ">||");
+                play_button.left = "50%";
+		play_button.width = "7%";
+		play_button.isPointerBlocker = true;
+		play_button.onPointerDownObservable.add(function() {
+		});
+		play_button.onPointerClickObservable.add(function() {
+			engine.enterFullscreen(false);
+			if ((state != STATE_PLAY) && (state != STATE_PAUSE)) {
+				scene.activeCamera.detachControl(canvas);
+				calibration_apple.isVisible = false;
+				calibration_apple.isPickable = false;
+				state = STATE_PLAY;
+				calib_button.color = "white";
+				play_button.color = "green";
+			} else if (state == STATE_PLAY) {
+				state = STATE_PAUSE;
+				play_button.color = "yellow";
+			} else if (state == STATE_PAUSE) {
+				state = STATE_PLAY;
+				play_button.color = "green";
+			}
+		});
+		setup_ui(play_button);
+		play_button.color = "green";
+
+		var calib_button = BABYLON.GUI.Button.CreateSimpleButton("calib", "Calib");
+                calib_button.left = "57%";
+		calib_button.width = "7%";
+		calib_button.isPointerBlocker = true;
+		calib_button.onPointerClickObservable.add(function() {
+			if (state != STATE_CALIB) {
+				scene.activeCamera.attachControl(canvas);
+				clear_conveyor();
+				calibration_apple.isVisible = true;
+				calibration_apple.isPickable = true;
+				state = STATE_CALIB;
+				play_button.color = "white";
+				calib_button.color = "green";
+			}
+		});
+		setup_ui(calib_button);
+
+		var reset_button = BABYLON.GUI.Button.CreateSimpleButton("reset", "Reset");
+                reset_button.left = "64%";
+		reset_button.width = "7%";
+		reset_button.isPointerBlocker = true;
+		reset_button.onPointerClickObservable.add(function() {
+			reset();
+			clear_conveyor();
+		});
+		setup_ui(reset_button);
+
+		var status = new BABYLON.GUI.Rectangle();
+                status.left = "71%";
+		status.width = "29%";
+		setup_ui(status);
+			
+		var status_text = new BABYLON.GUI.TextBlock("rt", "H: 0 M: 0 E: 0");
+                status_text.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+		status_text.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_BOTTOM;
+		status_text.width = "100%";
+                status_text.left = "0%";
+		status_text.color = "white";
+		status.addControl(status_text);
+
+		var startingPoint;
+		var currentMesh;
+		var refPlane = BABYLON.MeshBuilder.CreatePlane("plane", {height: 10000, width: 10000}, scene);
+		refPlane.rotation.x = Math.PI / 2;
+		refPlane.isVisible = false;
+
+		var getGroundPosition = function() {
+			// Use a predicate to get position on the ground
+			var pickInfo = scene.pick(scene.pointerX, scene.pointerY, function (mesh) { return mesh == refPlane; });
+			if (pickInfo.hit) {
+				return pickInfo.pickedPoint;
+			}
+
+			return null;
+		}
+
+		var onPointerDown = function (evt) {
+			if (evt.button !== 0) {
+				return;
+			}
+	
+			if (state == STATE_PLAY) {
+				var pickInfo = scene.pick(scene.pointerX, scene.pointerY, function (mesh) { return mesh.metadata == CLASS_NAMES[0]; });
+				if (pickInfo.hit) {
+					currentMesh = pickInfo.pickedMesh;
+					startingPoint = pickInfo.pickedPoint;
+		
+					currentMesh.dispose();
+					score++;
+
+				} else
+					errors++;
+				drawStatus();
+				camera.detachControl(canvas);
+
+			} else if (state == STATE_CALIB) {
+				// check if we are under a mesh
+				var pickInfo = scene.pick(scene.pointerX, scene.pointerY, function (mesh) { return mesh.metadata == "calib_fruit"; });
+				//var pickInfo = scene.pick(scene.pointerX, scene.pointerY);
+				if (pickInfo.hit) {
+					currentMesh = pickInfo.pickedMesh;
+					startingPoint = pickInfo.pickedPoint;
+		
+					if (startingPoint) { // we need to disconnect camera from canvas
+						setTimeout(function () {
+							camera.detachControl(canvas);
+						}, 0);
+						refPlane.position.y = startingPoint.y;
+						startingPoint.x = -startingPoint.x;
+						currentMesh.isPickable = false;
+					}
+				}
+			}
+		}
+
+		var onPointerUp = function () {
+			if (state != STATE_CALIB)
+				return;
+
+			if (startingPoint != null) {
+				camera.attachControl(canvas, true);
+				startingPoint = null;
+				currentMesh.isPickable = true;
+				return;
+			}
+		}
+
+		var onPointerMove = function (evt) {
+			if (state != STATE_CALIB)
+				return;
+
+			if (startingPoint == null) {
+				return;
+			}
+
+			var current = getGroundPosition(evt);
+
+			if (!current) {
+				return;
+			}
+
+			current.x = -current.x;
+			var diff = current.subtract(startingPoint);
+			currentMesh.position.addInPlace(diff);
+
+			startingPoint = current;
+
+		}
+
+		canvas.addEventListener("pointerdown", onPointerDown, false);
+		canvas.addEventListener("pointerup", onPointerUp, false);
+		canvas.addEventListener("pointermove", onPointerMove, false);
+
+
+		return scene;
+	};
+	var scene = createScene();
+	engine.runRenderLoop(function() {
+		scene.render();
+	});
+
+	// Watch for browser/canvas resize events
+	window.addEventListener("resize", function () {
+		engine.resize();
+	});
+
+	window.addEventListener('keypress', function(e) {
+		switch (e.key) {
+			case 'd':
+				if (scene.debugLayer.isVisible())
+					scene.debugLayer.hide();
+					else
+					scene.debugLayer.show();
+				break;
+			default:
+				break;
+		}
+	});
+
+	window.addEventListener("dblclick", function (e) {
+		engine.enterFullscreen(false);
+	});
+      </script>
+   </body>
+</html>

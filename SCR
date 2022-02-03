@@ -1,0 +1,15 @@
+NXP Software Content Register
+
+Release Name:           IMX Machine Inspection Demo
+Version:                1.0
+Date Created:           February-2022
+Release Location:       https://github.com/NXP/imx-machine-inspection-assets
+Description:            Assests for i.MX Machine Inspection Demo
+
+Package:                        conveyor
+Outgoing License:               Creative Commons Attribution 4.0
+License File:                   License.txt
+Package Category:               Conveyor simulation binaries
+Description and comments:       i.MX Machine Inspection Demo binaries files
+Type of content:                Binaries files and images
+Origin:                         "Lowpoly Fruits & Vegetables" by Loïc Norgeot (Creative Commons Attribution) - https://sketchfab.com/3d-models/lowpoly-fruits-vegetables-d3be8fed96eb48be88b47bbe8d2951e1.
